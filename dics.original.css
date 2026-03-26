@@ -107,7 +107,7 @@
     opacity : 1;
 }
 
-.b-dics__desaturate {
+.desaturate {
     filter: grayscale(100%);
 }
 /* Text Position
