@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>画像比較ツール</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    background: #f5f5f3;
+    color: #1a1a1a;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+  }
+
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin-bottom: 24px;
+    color: #1a1a1a;
+  }
+
+  .upload-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    width: 100%;
+    max-width: 760px;
+    margin-bottom: 24px;
+  }
+
+  .upload-box {
+    background: #fff;
+    border: 1.5px dashed #ccc;
+    border-radius: 10px;
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  .upload-box:hover { border-color: #888; background: #fafafa; }
+  .upload-box input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-box .icon { font-size: 28px; margin-bottom: 8px; }
+  .upload-box .label { font-size: 13px; color: #555; }
+  .upload-box .sublabel { font-size: 11px; color: #999; margin-top: 4px; }
+  .upload-box.has-image { border-style: solid; border-color: #aaa; }
+  .upload-box.has-image .preview-thumb {
+    width: 100%; height: 80px; object-fit: cover;
+    border-radius: 6px; margin-bottom: 8px;
+  }
+
+  .slider-wrapper {
+    width: 100%;
+    max-width: 760px;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+    overflow: hidden;
+    display: none;
+  }
+  .slider-wrapper.visible { display: block; }
+
+  .slider-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    overflow: hidden;
+    cursor: ew-resize;
+    user-select: none;
+    background: #111;
+  }
+
+  .slider-container img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    display: block;
+  }
+
+  #img-after {
+    clip-path: inset(0 0 0 50%);
+  }
+
+  .divider-line {
+    position: absolute;
+    top: 0; left: 50%;
+    width: 2px; height: 100%;
+    background: rgba(255,255,255,0.9);
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  .divider-handle {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: white;
+    border: 1.5px solid rgba(0,0,0,0.15);
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.2);
+  }
+  .divider-handle svg { width: 18px; height: 18px; }
+
+  .img-label {
+    position: absolute;
+    top: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: white;
+    background: rgba(0,0,0,0.5);
+    padding: 4px 10px;
+    border-radius: 4px;
+    pointer-events: none;
+  }
+  .label-before { left: 12px; }
+  .label-after { right: 12px; }
+
+  .slider-footer {
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #f0f0f0;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .pct-bar-wrap {
+    display: flex; align-items: center; gap: 10px; flex: 1;
+  }
+  .pct-bar-wrap label { font-size: 12px; color: #888; white-space: nowrap; }
+  input[type=range].pct-bar {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range].pct-bar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #1a1a1a;
+    cursor: pointer;
+  }
+  .pct-value { font-size: 12px; color: #555; min-width: 32px; text-align: right; }
+
+  .reset-btn {
+    font-size: 12px;
+    color: #555;
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .reset-btn:hover { background: #f5f5f5; }
+
+  .placeholder-msg {
+    padding: 48px 20px;
+    text-align: center;
+    color: #aaa;
+    font-size: 14px;
+  }
+
+  .tip {
+    margin-top: 20px;
+    font-size: 12px;
+    color: #aaa;
+    max-width: 760px;
+    text-align: center;
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+
+<h1>画像比較スライダー</h1>
+
+<div class="upload-area">
+  <div class="upload-box" id="box-before">
+    <input type="file" accept="image/*" id="input-before">
+    <div class="icon">🖼️</div>
+    <div class="label">編集前の画像</div>
+    <div class="sublabel">クリックまたはドロップ</div>
+  </div>
+  <div class="upload-box" id="box-after">
+    <input type="file" accept="image/*" id="input-after">
+    <div class="icon">✨</div>
+    <div class="label">編集後の画像</div>
+    <div class="sublabel">クリックまたはドロップ</div>
+  </div>
+</div>
+
+<div class="slider-wrapper" id="slider-wrapper">
+  <div class="slider-container" id="slider-container">
+    <img id="img-before" src="" alt="編集前">
+    <img id="img-after" src="" alt="編集後">
+    <div class="divider-line" id="divider-line"></div>
+    <div class="divider-handle" id="divider-handle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round">
+        <polyline points="9 18 3 12 9 6"/>
+        <polyline points="15 6 21 12 15 18"/>
+      </svg>
+    </div>
+    <div class="img-label label-before">編集前</div>
+    <div class="img-label label-after">編集後</div>
+  </div>
+  <div class="slider-footer">
+    <div class="pct-bar-wrap">
+      <label>境界位置</label>
+      <input type="range" class="pct-bar" id="pct-range" min="0" max="100" value="50" step="1">
+      <span class="pct-value" id="pct-value">50%</span>
+    </div>
+    <button class="reset-btn" id="reset-btn">リセット</button>
+  </div>
+</div>
+
+<div class="placeholder-msg" id="placeholder-msg">
+  ↑ 2枚の画像をアップロードすると比較スライダーが表示されます
+</div>
+
+<div class="tip">
+  画像はブラウザ内のみで処理され、サーバーには送信されません。
+</div>
+
+<script>
+const state = { before: null, after: null, pct: 50, dragging: false };
+
+const imgBefore = document.getElementById('img-before');
+const imgAfter = document.getElementById('img-after');
+const dividerLine = document.getElementById('divider-line');
+const dividerHandle = document.getElementById('divider-handle');
+const sliderWrapper = document.getElementById('slider-wrapper');
+const sliderContainer = document.getElementById('slider-container');
+const pctRange = document.getElementById('pct-range');
+const pctValue = document.getElementById('pct-value');
+const placeholder = document.getElementById('placeholder-msg');
+
+function updateSlider(pct) {
+  state.pct = pct;
+  imgAfter.style.clipPath = `inset(0 0 0 ${pct}%)`;
+  dividerLine.style.left = pct + '%';
+  dividerHandle.style.left = pct + '%';
+  pctRange.value = pct;
+  pctValue.textContent = Math.round(pct) + '%';
+}
+
+function tryShow() {
+  if (state.before && state.after) {
+    imgBefore.src = state.before;
+    imgAfter.src = state.after;
+    sliderWrapper.classList.add('visible');
+    placeholder.style.display = 'none';
+    updateSlider(50);
+  }
+}
+
+function loadImage(inputId, boxId, key) {
+  const input = document.getElementById(inputId);
+  const box = document.getElementById(boxId);
+  input.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      state[key] = ev.target.result;
+      box.classList.add('has-image');
+      box.querySelector('.icon').style.display = 'none';
+      box.querySelector('.label').textContent = file.name;
+      box.querySelector('.sublabel').textContent = (file.size / 1024).toFixed(0) + ' KB';
+      tryShow();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+loadImage('input-before', 'box-before', 'before');
+loadImage('input-after', 'box-after', 'after');
+
+function getPct(clientX) {
+  const rect = sliderContainer.getBoundingClientRect();
+  return Math.min(100, Math.max(0, (clientX - rect.left) / rect.width * 100));
+}
+
+sliderContainer.addEventListener('mousedown', e => { state.dragging = true; updateSlider(getPct(e.clientX)); });
+document.addEventListener('mousemove', e => { if (state.dragging) updateSlider(getPct(e.clientX)); });
+document.addEventListener('mouseup', () => state.dragging = false);
+sliderContainer.addEventListener('touchstart', e => { state.dragging = true; updateSlider(getPct(e.touches[0].clientX)); e.preventDefault(); }, { passive: false });
+document.addEventListener('touchmove', e => { if (state.dragging) updateSlider(getPct(e.touches[0].clientX)); }, { passive: false });
+document.addEventListener('touchend', () => state.dragging = false);
+
+pctRange.addEventListener('input', () => updateSlider(Number(pctRange.value)));
+document.getElementById('reset-btn').addEventListener('click', () => updateSlider(50));
+
+['box-before', 'box-after'].forEach(id => {
+  const box = document.getElementById(id);
+  box.addEventListener('dragover', e => e.preventDefault());
+  box.addEventListener('drop', e => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const key = id === 'box-before' ? 'before' : 'after';
+    const inputId = id === 'box-before' ? 'input-before' : 'input-after';
+    const reader = new FileReader();
+    reader.onload = ev => {
+      state[key] = ev.target.result;
+      box.classList.add('has-image');
+      box.querySelector('.icon').style.display = 'none';
+      box.querySelector('.label').textContent = file.name;
+      box.querySelector('.sublabel').textContent = (file.size / 1024).toFixed(0) + ' KB';
+      tryShow();
+    };
+    reader.readAsDataURL(file);
+  });
+});
+</script>
+</body>
+</html>
